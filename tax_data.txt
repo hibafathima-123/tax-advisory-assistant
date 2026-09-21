@@ -1,5 +1,5 @@
 ===========================
-INDIAN INCOME TAX GUIDE 2024-25
+INDIAN INCOME TAX GUIDE 2026-27
 ===========================
 
 --- SECTION 1: BASIC DEFINITIONS ---
@@ -12,10 +12,10 @@ Taxable income is the portion of your total income on which you are required to 
 Taxable Income = Gross Total Income - Deductions (under Chapter VI-A) - Exemptions
 
 WHAT IS A FINANCIAL YEAR (FY)?
-A Financial Year (FY) runs from April 1 to March 31 of the following year. For example, FY 2024-25 runs from April 1, 2024 to March 31, 2025.
+A Financial Year (FY) runs from April 1 to March 31 of the following year. For example, FY 2026-27 runs from April 1, 2026 to March 31, 2027.
 
 WHAT IS AN ASSESSMENT YEAR (AY)?
-An Assessment Year (AY) is the year immediately following the Financial Year, during which you file your tax return. For income earned in FY 2024-25, the Assessment Year is AY 2025-26.
+An Assessment Year (AY) is the year immediately following the Financial Year, during which you file your tax return. For income earned in FY 2026-27, the Assessment Year is AY 2027-28.
 
 WHAT IS A DEDUCTION?
 A deduction is an amount that is subtracted from your gross total income before calculating tax. Deductions reduce your taxable income, thereby reducing your tax liability.
@@ -32,7 +32,7 @@ PAN is a 10-digit alphanumeric identifier issued by the Income Tax Department. I
 WHAT IS ITR (INCOME TAX RETURN)?
 An ITR is a form that taxpayers file with the Income Tax Department to report their income, deductions, and tax paid. The due date for individuals is usually July 31 of the Assessment Year.
 
---- SECTION 2: INCOME TAX SLABS (OLD REGIME) FY 2024-25 ---
+--- SECTION 2: INCOME TAX SLABS (OLD REGIME) FY 2026-27 ---
 
 The Old Tax Regime allows various deductions and exemptions and has the following tax slabs for individuals below 60 years of age:
 
@@ -63,21 +63,22 @@ HEALTH AND EDUCATION CESS: 4% on (Tax + Surcharge) for all taxpayers.
 REBATE UNDER SECTION 87A (Old Regime):
 If your total taxable income is up to Rs. 5,00,000, you get a tax rebate of Rs. 12,500 or the actual tax payable, whichever is lower. This effectively means ZERO TAX for income up to Rs. 5,00,000 in the old regime.
 
---- SECTION 3: INCOME TAX SLABS (NEW REGIME) FY 2024-25 ---
+--- SECTION 3: INCOME TAX SLABS (NEW REGIME) FY 2026-27 ---
 
 The New Tax Regime (Default from FY 2023-24) has lower tax rates but does NOT allow most deductions and exemptions. It was updated in Budget 2024.
 
-Income up to Rs. 3,00,000 - No Tax (NIL)
-Income from Rs. 3,00,001 to Rs. 7,00,000 - 5% tax
-Income from Rs. 7,00,001 to Rs. 10,00,000 - 10% tax
-Income from Rs. 10,00,001 to Rs. 12,00,000 - 15% tax
-Income from Rs. 12,00,001 to Rs. 15,00,000 - 20% tax
-Income above Rs. 15,00,000 - 30% tax
+Income up to Rs. 4,00,000 - No Tax (NIL)
+Income from Rs. 4,00,001 to Rs. 8,00,000 - 5% tax
+Income from Rs. 8,00,001 to Rs. 12,00,000 - 10% tax
+Income from Rs. 12,00,001 to Rs. 16,00,000 - 15% tax
+Income from Rs. 16,00,001 to Rs. 20,00,000 - 20% tax
+Income from Rs. 20,00,001 to Rs. 24,00,000 - 25% tax
+Income above Rs. 24,00,000 - 30% tax
 
 STANDARD DEDUCTION under New Regime: Rs. 75,000 (increased from Rs. 50,000 in Budget 2024)
 
 REBATE UNDER SECTION 87A (New Regime):
-If your total taxable income is up to Rs. 7,00,000, you get a full tax rebate. This means ZERO TAX for income up to Rs. 7,00,000 under the new regime.
+If your total taxable income is up to Rs. 12,00,000, eligible taxpayers may receive rebate benefits under Section 87A, effectively resulting in zero tax liability under the new regime (subject to applicable conditions and government rules).
 
 SURCHARGE under New Regime: Maximum surcharge is capped at 25% (compared to 37% in old regime).
 
@@ -231,9 +232,6 @@ Section 234C: 1% per month for deferment of advance tax installments.
 
 Q: Is agricultural income taxable in India?
 A: No, agricultural income is completely exempt from income tax under Section 10(1). However, it is used for rate purposes (to determine the applicable tax rate on non-agricultural income) if it exceeds Rs. 5,000.
-
-Q: I am 90 years old and my income is less than Rs. 4,00,000. Should I pay tax?
-A: If you are 90 years old, you are a Super Senior Citizen under the old tax regime. Under the old regime, income up to Rs. 5,00,000 for Super Senior Citizens is NIL, so income below Rs. 4,00,000 results in no tax. Under the new regime, the Section 87A rebate means taxable income up to Rs. 7,00,000 results in zero tax. So, based on this knowledge base, income below Rs. 4,00,000 means no tax in either regime.
 
 Q: What is the tax on gifts received?
 A: Gifts received exceeding Rs. 50,000 in a year are taxable under "Income from Other Sources" unless received from relatives (spouse, siblings, parents, grandparents, etc.) or on occasions like marriage.

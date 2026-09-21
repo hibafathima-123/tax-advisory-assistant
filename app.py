@@ -7,8 +7,9 @@
 # Run with:  streamlit run app.py
 # ============================================================
 
-import os
 import html
+from pathlib import Path
+
 import streamlit as st
 from rag_core import initialize_rag, get_answer
 
@@ -186,8 +187,19 @@ st.markdown("""
 # -------------------------------------------------------
 # PATH TO DATA FILE
 # -------------------------------------------------------
-# Looks for tax_data.txt in the same directory as app.py
-DATA_FILE = os.path.join(os.path.dirname(__file__), "tax_data.txt")
+APP_DIR = Path(__file__).resolve().parent
+DATA_FILE_CANDIDATES = ("tax_data.txt", "tax_data_.txt")
+
+
+def resolve_data_file() -> Path:
+    """Return the first available knowledge-base file in the app directory."""
+    for candidate in DATA_FILE_CANDIDATES:
+        candidate_path = APP_DIR / candidate
+        if candidate_path.exists():
+            return candidate_path
+
+    checked_paths = ", ".join(str(APP_DIR / candidate) for candidate in DATA_FILE_CANDIDATES)
+    raise FileNotFoundError(f"No knowledge base file found. Checked: {checked_paths}")
 
 # -------------------------------------------------------
 # CACHED INITIALIZATION
@@ -196,9 +208,10 @@ DATA_FILE = os.path.join(os.path.dirname(__file__), "tax_data.txt")
 # Without caching, it would reload models on every interaction.
 # -------------------------------------------------------
 @st.cache_resource(show_spinner=False)
-def load_rag_chain():
+def load_rag_chain(data_file_path: str, data_file_mtime: float):
     """Load and cache the entire RAG pipeline."""
-    return initialize_rag(DATA_FILE)
+    _ = data_file_mtime
+    return initialize_rag(data_file_path)
 
 # -------------------------------------------------------
 # HEADER
@@ -227,7 +240,7 @@ with st.sidebar:
     st.markdown("""
     <div class="info-box">
     🔹 <strong>LangChain</strong> — RAG pipeline<br>
-    🔹 <strong>TF-IDF Retriever</strong> — Local document retrieval<br>
+    🔹 <strong>FAISS + Sentence-Transformers</strong> — Local semantic retrieval<br>
     🔹 <strong>Groq</strong> — Hosted LLM inference<br>
     🔹 <strong>Streamlit</strong> — Web interface<br>
     🔹 <strong>Python 3.10+</strong>
@@ -238,7 +251,7 @@ with st.sidebar:
     st.markdown("### 💡 Sample Questions")
 
     sample_questions = [
-        "What are the income tax slabs for FY 2024-25?",
+        "What are the income tax slabs for FY 2026-27?",
         "What is Section 80C deduction limit?",
         "What is the difference between old and new tax regime?",
         "How much can I save under Section 80D?",
@@ -275,10 +288,15 @@ st.markdown('<p class="section-label">System Status</p>', unsafe_allow_html=True
 
 with st.spinner("🔄 Initializing Groq connection and knowledge base..."):
     try:
-        qa_chain = load_rag_chain()
+        data_file = resolve_data_file()
+        qa_chain = load_rag_chain(str(data_file), data_file.stat().st_mtime)
         st.markdown('<span class="status-ready">✅ Knowledge Base Ready</span>', unsafe_allow_html=True)
+        st.caption(f"Using knowledge file: `{data_file.name}`")
     except FileNotFoundError:
-        st.error(f"❌ Could not find `tax_data.txt` at: `{DATA_FILE}`\n\nMake sure the file exists in the same folder as `app.py`.")
+        st.error(
+            "❌ Could not find the tax knowledge base file.\n\n"
+            f"Checked: `{', '.join(DATA_FILE_CANDIDATES)}` in `{APP_DIR}`."
+        )
         st.stop()
     except Exception as e:
         st.error(f"❌ Failed to initialize RAG pipeline:\n\n`{str(e)}`")
@@ -346,8 +364,8 @@ if ask_button:
 st.markdown("<br><hr>", unsafe_allow_html=True)
 st.markdown("""
 <div style='text-align:center; font-size:0.8rem; color:#3a5070; padding-bottom:10px;'>
-    Built with ❤️ using LangChain + TF-IDF + Groq + Streamlit &nbsp;|&nbsp;
-    Data: Indian Income Tax Guidelines FY 2024-25<br>
+    Built with ❤️ using LangChain + FAISS + Groq + Streamlit &nbsp;|&nbsp;
+    Data: Indian Income Tax Guidelines FY 2026-27<br>
     <em>This tool is for educational/demonstration purposes only. Not a substitute for professional tax advice.</em>
 </div>
 """, unsafe_allow_html=True)

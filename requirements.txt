@@ -1,6 +1,5 @@
 # Core RAG framework (langchain.text_splitter, langchain_core.documents)
 langchain==0.2.16
-langchain-community==0.2.16
 langchain-core==0.2.38
 
 # LLM client (OpenAI-compatible SDK, used to call Groq's endpoint)
@@ -12,11 +11,14 @@ streamlit==1.37.1
 # .env loading for GROQ_API_KEY
 python-dotenv==1.0.1
 
-# Required by langchain_community.retrievers.TFIDFRetriever
-# NOTE: scikit-learn 1.8.0 requires Python >=3.11, which conflicts with
-# this app's stated "Python 3.10+" support (see app.py sidebar). Pinned to
-# the 1.5.x line here, which still supports Python 3.9-3.13.
-scikit-learn==1.5.2
+# Embedding-based semantic retrieval (replaces TF-IDF / scikit-learn)
+# sentence-transformers pulls in torch automatically; the CPU-only wheel
+# is what pip resolves by default on Windows unless a CUDA index is set,
+# which keeps installs simple and avoids GPU/CUDA setup requirements.
+sentence-transformers==3.0.1
+
+# Local vector similarity search (FAISS IndexFlatIP)
+faiss-cpu==1.8.0.post1
 
 # Transitive dependencies, pinned explicitly for reproducible installs
 numpy==1.26.4

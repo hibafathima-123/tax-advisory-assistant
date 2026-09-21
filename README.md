@@ -6,7 +6,7 @@ Technology: RAG (Retrieval-Augmented Generation) + Deterministic Tax Calculation
 This project builds an AI-powered Tax Advisory Chatbot for Indian income tax questions. It combines two things:
 Retrieval-Augmented Generation (RAG) — for general/explanatory tax questions, the app retrieves relevant passages from a curated knowledge file and asks a Groq-hosted LLM to answer using only that retrieved context.
 A deterministic Python tax calculator — for questions asking "how much tax will I pay", the app skips the LLM entirely and computes the exact old-regime / new-regime tax (with cess and the Section 87A rebate) using fixed slab formulas, so numeric answers are never left to LLM guesswork.
-Retrieval in this project is TF-IDF based (`langchain_community.retrievers.TFIDFRetriever`, backed by scikit-learn) — a lightweight, keyword-frequency retriever. There is no FAISS vector database and no embedding model in this implementation.
+Retrieval in this project is **semantic, embedding-based** — a local `SentenceTransformer` (`sentence-transformers/all-MiniLM-L6-v2`) embeds both the knowledge-base chunks and the user's query, and a **FAISS** `IndexFlatIP` index (using L2-normalized embeddings, so inner product = cosine similarity) finds the top-6 most similar chunks. There is no TF-IDF, no keyword-frequency matching, and no scikit-learn dependency in this implementation — retrieval is based on semantic meaning, not literal term overlap.
 ---
 🧭 How It Works
 ```text
@@ -19,9 +19,10 @@ Retrieval in this project is TF-IDF based (`langchain_community.retrievers.TFIDF
               ┌───────────────┴───────────────┐
               │ Yes                            │ No
               ▼                                ▼
-   Python computes old-regime /        Retrieve top-6 chunks from
-   new-regime tax directly             the TF-IDF index (tax_data.txt)
-   (slabs + 4% cess + 87A rebate)                │
+   Python computes old-regime /        Embed the query, then retrieve
+   new-regime tax directly             top-6 chunks via FAISS similarity
+   (slabs + 4% cess + 87A rebate)      search over tax_data.txt
+              │                                  │
               │                                  ▼
               │                       Build a context-only prompt
               │                       and call the Groq LLM
@@ -51,10 +52,11 @@ tax_advisory_assistant/
 Component	Technology
 UI Framework	Streamlit
 RAG Framework	LangChain (`RecursiveCharacterTextSplitter`, `Document`)
-Retrieval	TF-IDF — `langchain_community.retrievers.TFIDFRetriever` (k=6), backed by scikit-learn's `TfidfVectorizer`. No vector database, no embeddings.
+Embeddings	`sentence-transformers/all-MiniLM-L6-v2` — local, CPU, runs via the `sentence-transformers` library
+Retrieval	FAISS — `faiss.IndexFlatIP` (k=6) over L2-normalized embeddings, so inner product = cosine similarity. No keyword/TF-IDF matching.
 Deterministic Calculator	Plain Python — regex-based intent/amount/age extraction + progressive tax-slab math
 LLM Provider	Groq — accessed via the standard `openai` Python SDK pointed at Groq's OpenAI-compatible endpoint
-Default Model	`llama-3.1-8b-instant` (override with the `GROQ_MODEL` environment variable — no code changes needed)
+Default Model	`openai/gpt-oss-120b` (override with the `GROQ_MODEL` environment variable — no code changes needed)
 Config	`python-dotenv` (loads `GROQ_API_KEY` from `.env`)
 Language	Python 3.10+
 ---
@@ -110,7 +112,9 @@ STEP 5: Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
-This installs LangChain, the OpenAI SDK (used to talk to Groq), Streamlit, scikit-learn (for TF-IDF), and a few small supporting libraries. There's no PyTorch or Transformers in this project, so the install is quick and lightweight (well under 100 MB).
+This installs LangChain, the OpenAI SDK (used to talk to Groq), Streamlit, `sentence-transformers` (which pulls in PyTorch CPU automatically for embeddings), `faiss-cpu` (for vector similarity search), and a few small supporting libraries. There's no scikit-learn in this project anymore.
+
+> **First run note:** `sentence-transformers` downloads the MiniLM embedding model (~80 MB) from Hugging Face the first time the app runs, and caches it locally afterward — so the very first startup needs an internet connection, but every run after that works offline.
 ---
 STEP 6: Set Up Your Groq API Key
 This project uses the Groq API (via the OpenAI-compatible SDK), not the OpenAI API directly.
@@ -122,7 +126,7 @@ In the project root, create a file named `.env` (there's no template file to cop
 GROQ_API_KEY=your-groq-api-key
 ```
 3. (Optional) Choose a different model
-By default the app uses `llama-3.1-8b-instant`. To use a different Groq-hosted model, set an environment variable — no code editing required:
+By default the app uses `openai/gpt-oss-120b`. To use a different Groq-hosted model, set an environment variable — no code editing required:
 ```env
 GROQ_API_KEY=your-groq-api-key
 GROQ_MODEL=llama-3.1-70b-versatile
@@ -145,7 +149,7 @@ The browser will open automatically at `http://localhost:8501`.
 STEP 8: First Run Behavior
 On first run, the app will:
 Read `tax_data.txt` (or `tax_data_.txt`) and split it into chunks
-Build a TF-IDF index over those chunks (fast, in-memory — no model downloads)
+Load the `all-MiniLM-L6-v2` embedding model and embed every chunk, then build a FAISS `IndexFlatIP` index over those embeddings (downloads the model from Hugging Face the very first time only)
 Connect to the Groq API using your `.env` key
 Show:
 ```text
@@ -168,6 +172,11 @@ These match the clickable sample-question buttons in the app's sidebar:
 10	What is standard deduction for salaried employees?	LLM + retrieved context
 You can also try a calculation question, which is routed to the deterministic calculator instead of the LLM, e.g.:
 > "How much tax will I pay on Rs. 8,00,000 income?"
+> "My annual income is ₹15 lakh and I am 30 years old, how much tax will I pay?"
+
+Both `₹` and spelled-out "Rs./INR/rupees" work, and "lakh"/"crore" amounts are converted automatically. A stated age is extracted separately and never confused with the income figure.
+
+You can also try a paraphrased question that shares few exact keywords with the knowledge base, e.g. "Can you explain the tax relief available under Section 87A?" — semantic (embedding-based) retrieval is designed to still surface the right chunk here, which a purely keyword-based retriever could miss.
 ---
 📊 Example Output
 Question:
@@ -183,10 +192,15 @@ Answer:
 1. Document Loading
 ```python
 data_path = Path(data_file_path).expanduser().resolve()
-text = data_path.read_text(encoding="utf-8")
+for encoding in ("utf-8", "utf-8-sig"):
+    try:
+        text = data_path.read_text(encoding=encoding)
+        break
+    except UnicodeDecodeError:
+        continue
 documents = [Document(page_content=text, metadata={"source": str(data_path)})]
 ```
-Reads the knowledge file directly (trying `utf-8` then `utf-8-sig`) and wraps it as a LangChain `Document`. No `TextLoader` class is used.
+Reads the knowledge file directly, trying `utf-8` first and falling back to `utf-8-sig` if that fails, then wraps it as a LangChain `Document`. No `TextLoader` class is used.
 ---
 2. Text Chunking
 ```python
@@ -199,34 +213,45 @@ chunks = splitter.split_documents(documents)
 ```
 Splits the document into overlapping chunks for retrieval.
 ---
-3. Retrieval Index (TF-IDF, not embeddings)
+3. Retrieval Index (Sentence-Transformer embeddings + FAISS)
 ```python
-retriever = TFIDFRetriever.from_documents(documents, k=6)
+class FaissRetriever:
+    def __init__(self, documents, embedding_model_name=EMBEDDING_MODEL_NAME, k=RETRIEVER_TOP_K):
+        self.model = SentenceTransformer(embedding_model_name)
+        embeddings = self.model.encode(
+            [doc.page_content for doc in documents],
+            convert_to_numpy=True,
+            normalize_embeddings=True,   # inner product == cosine similarity
+        ).astype("float32")
+        self.index = faiss.IndexFlatIP(embeddings.shape[1])
+        self.index.add(embeddings)
 ```
-Builds a keyword-frequency index over the chunks. There's no embedding step and no vector database — retrieval is based on term overlap between the query and each chunk.
+Each chunk is embedded once with `sentence-transformers/all-MiniLM-L6-v2`, normalized, and added to a FAISS `IndexFlatIP` index. At query time, the query is embedded the same way and `index.search()` returns the indices of the top-6 nearest chunks by cosine similarity — retrieval is based on semantic meaning, not term overlap. The class also guards against a few real-world failure cases: a missing `faiss-cpu` install, an empty knowledge base, and an embedding-model load failure all raise clear, specific errors instead of crashing silently.
 ---
 4. Query Enrichment
 ```python
 retrieval_query = enrich_query(query)
 ```
-Before retrieval, `enrich_query()` appends helpful hint terms detected in the question — e.g. an age band, a taxable-income figure, or "section 87A rebate" — so the TF-IDF search is more likely to surface the right chunk.
+Before retrieval, `enrich_query()` appends helpful hint terms detected in the question — e.g. an age band, a taxable-income figure, or "section 87A rebate" — so the FAISS search has more relevant text to embed and match against.
 ---
 5. Intent Check — Calculation vs. Explanation
 ```python
 tax_guidance = build_tax_guidance(query)
 ```
 `is_tax_calculation_query()` checks for phrases like "how much tax" or "tax liability." If matched, `build_tax_guidance()` extracts the taxable income (and age, if given) and computes the tax directly — the LLM is never called for this branch.
+
+**Amount & age extraction.** Taxable income is pulled out with `extract_inr_amount()`, which understands the `₹` symbol, the words "Rs./INR/rupees", and "lakh"/"crore" multipliers (so "₹15 lakh" resolves to Rs. 15,00,000, and "2 crore" resolves to Rs. 2,00,00,000) — with or without an explicit currency marker. Age is pulled separately via an "NN years old" pattern and is stripped out of the query *before* amount extraction runs, so a stated age (e.g. "I am 30 years old") is never mistaken for the income figure. If the query mentions a foreign currency code (USD, EUR, GBP, etc.) with no INR amount given, the calculator asks for the INR-converted figure instead of guessing.
 ---
 6. Prompt Building (non-calculation questions only)
 ```python
 prompt = build_prompt(context, query)
 ```
-Assembles a strict, context-only instruction prompt: answer only from the retrieved text, use Indian number formatting, don't mix old-regime and new-regime rules, and say so explicitly if the answer isn't in the context.
+Assembles a strict, context-only instruction prompt: answer only from the retrieved text, use Indian number formatting, don't mix old-regime and new-regime rules, and say so explicitly if the answer isn't in the context. If FAISS returns no chunks at all for a query, the app skips the LLM call and returns a direct "couldn't find relevant information" message instead.
 ---
 7. LLM Call
 ```python
 response = client.chat.completions.create(
-    model=model_name,      # default: llama-3.1-8b-instant
+    model=model_name,      # default: openai/gpt-oss-120b
     temperature=0.1,
     max_tokens=512,
     messages=[{"role": "user", "content": prompt}],
@@ -252,12 +277,14 @@ GROQ_API_KEY=your-groq-api-key
 ❌ `FileNotFoundError: No knowledge base file found`
 Make sure `tax_data.txt` (or `tax_data_.txt`) is in the same folder as `app.py`.
 ---
-❌ `scikit-learn` fails to install
-`TFIDFRetriever` depends on scikit-learn. If installation fails, try upgrading pip first:
+❌ `ImportError: The 'faiss' package is not installed`
+The FAISS retriever depends on `faiss-cpu`. If installation failed or was skipped, install it explicitly:
 ```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install faiss-cpu
 ```
+---
+❌ Embedding model fails to load / first run seems stuck downloading
+`sentence-transformers` needs an internet connection the first time it runs, to download `all-MiniLM-L6-v2` (~80 MB) from Hugging Face. If it's hanging or failing, check your connection and try again — after the first successful run, the model is cached locally and no further downloads happen.
 ---
 ❌ Port 8501 already in use
 ```bash
@@ -276,8 +303,8 @@ streamlit run app.py --server.port 8502
 │                  RAG CORE (rag_core.py)                     │
 │                                                               │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐ │
-│  │  Text Loader │──►│Text Splitter │──►│  TF-IDF Index    │ │
-│  │ tax_data.txt │   │ (600 / 100)  │   │ (scikit-learn)   │ │
+│  │  Text Loader │──►│Text Splitter │──►│ Embed + FAISS    │ │
+│  │ tax_data.txt │   │ (600 / 100)  │   │ IndexFlatIP (k=6)│ │
 │  └──────────────┘   └──────────────┘   └────────┬─────────┘ │
 │                                                  │           │
 │                          ┌───────────────────────┴──────┐   │
@@ -294,7 +321,21 @@ streamlit run app.py --server.port 8502
 └─────────────────────────────────────────────────────────────┘
 ```
 ---
+🚧 Limitations
+The knowledge base is a static text file — it does not automatically reflect future Budget changes unless `tax_data.txt` is manually updated.
+The deterministic calculator computes tax based on slabs, 4% cess, and the Section 87A rebate only; it does not account for surcharge or additional deductions/exemptions unless explicitly stated in the query.
+The app does not maintain conversation history — each question is answered independently, with no memory of earlier turns.
+Retrieval quality depends on a general-purpose embedding model (`all-MiniLM-L6-v2`); it is not fine-tuned specifically on Indian tax terminology.
+This is an educational/demonstration project, not a substitute for professional tax advice.
+---
+🔮 Future Enhancements
+Re-ranking retrieved chunks (e.g. with a cross-encoder) for higher-precision context on ambiguous questions.
+A pipeline to refresh `tax_data.txt` automatically when tax rules change each Budget.
+Multi-turn conversational memory, so follow-up questions can reference earlier context.
+Basic authentication and query logging for multi-user deployments.
+Surcharge and additional-deduction support in the deterministic calculator.
+---
 📝 License
 This project is created for educational purposes as part of a Data Science capstone project. It is not a substitute for professional tax advice — consult a qualified CA for real tax decisions.
 ---
-Built with LangChain + TF-IDF (scikit-learn) + Groq + Streamlit
+Built with LangChain + Sentence-Transformers + FAISS + Groq + Streamlit
